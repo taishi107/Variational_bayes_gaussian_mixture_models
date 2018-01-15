@@ -28,3 +28,5 @@ $ rosrun Variational_bayes_gaussian_mixture_models logger.py
 $ ctrl -C
 $ rosrun Variational_bayes_gaussian_mixture_models vbgmm.py
 ```
+## License
+このリポジトリは、MITライセンス下です。
