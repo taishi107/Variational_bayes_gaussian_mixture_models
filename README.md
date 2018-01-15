@@ -2,7 +2,7 @@
 LightSensorからバグファイルに記録して、変分ベイズによる混合ガウス分布のパラメータ推定を用いたクラスタリングを行うパッケージです。
 
 ## Demo
-* [VBGMM clustering](https://www.youtube.com/watch?v=n3WNia25V1Q)
+* [VBGMM clustering](https://www.youtube.com/watch?v=rWt3-W2nMFE&feature=youtu.be)
 
 ## Requirements
 * Raspberry Pi Mouse
