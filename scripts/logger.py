@@ -1,7 +1,5 @@
 #!/usr/bin/env python
-# Copyright 2017 Masahiro Kato
-# Copyright 2017 Ryuichi Ueda
-# Released under the BSD License.
+
 import signal
 import sys
 

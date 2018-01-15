@@ -6,30 +6,33 @@ import numpy as np
 from geometry_msgs.msg import Twist
 from std_srvs.srv import Trigger, TriggerResponse
 from raspimouse_ros.msg import LightSensorValues
-
+from sklearn.decomposition import PCA
 from sklearn.preprocessing import StandardScaler
 from numpy import linalg as la
-from numpy.random import *
-
 from scipy.special import digamma
 from scipy.stats import multivariate_normal
 import math
-#from numpy.random import *
 import random
 import csv
 
 
-class VBGMM():
+class Logger():
     def __init__(self):
         self.sensor_values = LightSensorValues()
         print("start")
         #self._decision = rospy.Publisher('/cluster',LightSensorValues,queue_size=100)
         rospy.Subscriber('/event', LightSensorValues, self.sensor_callback)
         
-        self.k = 6
-        self.D = 4
+        self.k = 8
         self.reset()
-        self.g_sigma = np.array([np.identity(self.D) for i in range(self.k)])
+        self.g_sigma = [[[0.1,0],[0,0.1]],
+                        [[0.1,0],[0,0.1]],
+                        [[0.1,0],[0,0.1]],
+                        [[0.1,0],[0,0.1]],
+                        [[0.1,0],[0,0.1]],
+                        [[0.1,0],[0,0.1]],
+                        [[0.1,0],[0,0.1]],
+                        [[0.1,0],[0,0.1]]]
         self.pai = [1.0/self.k for i in range(self.k)]
 
 	self.on = True
@@ -42,15 +45,14 @@ class VBGMM():
     def reset(self):
         self.label = []
         self.count = np.zeros((self.k,1))
-        self.sum = np.zeros((self.k,self.D))
+        self.sum = np.zeros((self.k,2))
         self.t = np.zeros((self.k,1))
 
     def cluster_center(self,samples):
         clus_center = []
         for i in range(self.k):
-            #clus_center.append(random.choice(samples))
-            num = randint(0,self.N)
-            clus_center.append(samples[num])
+            clus_center.append(random.choice(samples))
+            #clus_center.append([random.uniform(min(samples[:,0])+1.5,max(samples[:,0])-1.5),random.uniform(min(samples[:,1])+1.5,max(samples[:,1])-1.5)])
         self.mu = np.array(clus_center)
 
     def EM_step(self,sample,mu):
@@ -79,15 +81,15 @@ class VBGMM():
             sum_p = 0.0
             p=[]
             for j in range(self.k):
-                sum_p += self.pai[j]*gauss[j].pdf(samples[i])
+                sum_p += self.pai[j]*gauss[j].pdf([samples[i][0],samples[i][1]])
             for j in range(self.k):
-                p.append(self.pai[j]*gauss[j].pdf(samples[i])/sum_p)
+                p.append(self.pai[j]*gauss[j].pdf([samples[i][0],samples[i][1]])/sum_p)
             ganma.append(p)
         return ganma
 
     def cal(self,ganma,samples):
-        mu = np.zeros((self.k,self.D))
-        S = np.zeros((self.k,self.D,self.D))
+        mu = np.zeros((self.k,2))
+        S = np.zeros((self.k,2,2))
         N_k = []
     
         for k in range(self.k):
@@ -103,7 +105,7 @@ class VBGMM():
             mu[k] = sum_r/N_k[k]
             sigma = []
             sigma = [samples[j]-mu[k] for j in range(self.N)]
-            tmp = np.zeros((1,self.D,self.D))
+            tmp = np.zeros((1,2,2))
             for n in range(self.N):
                 tmp += (ganma[n][k]*sigma[n])*sigma[n][:, np.newaxis]
             tmp2 = tmp/N_k[k]
@@ -114,13 +116,13 @@ class VBGMM():
         alpha_0 = 0.001
         beta_0 = 0.001
         nu_0 = 1.0
-        m_0 = np.zeros((self.k,self.D))
-        m = np.zeros((self.k,self.D))
-        W_0 = np.identity(self.D)
+        m_0 = np.zeros((self.k,2))
+        m = np.zeros((self.k,2))
+        W_0 = np.identity(2)
         alpha=[]
         beta=[]
         nu=[]
-        W = np.zeros((self.k,self.D,self.D))
+        W = np.zeros((self.k,2,2))
         for k in range(self.k):
             alpha.append(alpha_0 + N_k[k])
             beta.append(beta_0 + N_k[k])
@@ -140,19 +142,19 @@ class VBGMM():
         E_mu_A = []
         r = []
         for k in range(self.k):
-            tmp = sum([digamma((nu[k]+1-i)/2)for i in range(1,self.D+1)])
-            E = tmp +self.D*math.log(2)+math.log(la.norm(W[k]))
+            tmp = sum([digamma((nu[k]+1-i)/2)for i in range(1,2+1)])
+            E = tmp +2*math.log(2)+math.log(la.norm(W[k]))
             E_ln_A.append(E)
         
             E =  digamma(alpha[k])-digamma(sum(alpha))
             E_ln_pi.append(E)
         for n in range(self.N):
-            tmp = [(self.D/beta[k])+nu[k]*np.dot((samples[n] - m[k]),np.dot(W[k],(samples[n] - m[k]).T)) for k in range(self.k)]
+            tmp = [(2/beta[k])+nu[k]*np.dot((samples[n] - m[k]),np.dot(W[k],(samples[n] - m[k]).T)) for k in range(self.k)]
             E_mu_A.append(tmp)
         for n in range(self.N):
-            tmp = [np.exp(np.array(E_ln_pi[k]) + np.array(E_ln_A[k])/2 - self.D*math.log(2*math.pi)/2-np.array(E_mu_A[n][k])/2) for k in range(self.k)]
+            tmp = [np.exp(np.array(E_ln_pi[k]) + np.array(E_ln_A[k])/2 - 2*math.log(2*math.pi)/2-np.array(E_mu_A[n][k])/2) for k in range(self.k)]
             for k in range(self.k):
-                if tmp[k] < 1e-3:
+                if tmp[k] < 1e-10:
                     tmp[k] = 1e-10
             tmp2 = np.array(tmp)/sum(tmp)
             
@@ -177,8 +179,8 @@ class VBGMM():
 	    return
 	else:
 	    if not self.bag_open:
-                print("---------------------")
-                print("Start")
+                #print("---------------------")
+                #print("Start")
 
                 try:
 		    #filename = datetime.datetime.today().strftime("sensor"
@@ -210,18 +212,22 @@ class VBGMM():
                         writer.writerows(self.sensor_data)
                     print('csv!!!')
                     sensor_values = np.c_[self.left_forward, self.left_side, self.right_side, self.right_forward]
-                    sensor_values = np.delete(sensor_values,0,0)
-                    sensor_values = np.delete(sensor_values,0,0)
-
-                    print(sensor_values)
+                    
                     ss = StandardScaler()
                     ss.fit(sensor_values)
                     sensor_ss = ss.transform(sensor_values)
-                    #pca = PCA(n_components=2)
-                    #self.samples = pca.fit_transform(sensor_ss)
-                    print(sensor_ss)
-                    self.samples = sensor_ss
+                    pca = PCA(n_components=2)
+                    self.samples = pca.fit_transform(sensor_ss)
+                    
                     self.N = len(self.samples)
+                    print("x:min")
+                    print(min(self.samples[:,0]))
+                    print("x:max")
+                    print(max(self.samples[:,0]))
+                    print("y:min")
+                    print(min(self.samples[:,1]))
+                    print("y:max")
+                    print(max(self.samples[:,1]))
                     print("start clustering")
                 except:
                     print('--------------')
@@ -230,42 +236,33 @@ class VBGMM():
     def run(self):
         rate = rospy.Rate(10)
         data = Twist()
-        count = 50
+        count = 100
         pai2 = []
         self.fin = [0 for i in range(self.k)]
         samples = self.samples
 
-        for j in range(100):
+        for j in range(200):
             self.cluster_center(samples)
             for i in range(10):
                 self.EM_step(samples,self.mu)
             val = [math.isnan(self.mu[x][0]) for x in range(self.k)]
-            ###print(val)
+            print(val)
             check = True in val
             if check == False:
-                ###print(j)
+                print(j)
                 break;
             #self.mu = []
-        ###clus_center = self.mu
-        clus_center = np.array([[0.83106795,0.96378333,0.49303615,0.48796475],
-                                [-1.1361861,-1.13290502,0.48426927,0.48489334],
-                                [0.91077984,0.8392451,0.51823427,0.48978049],
-                                [0.84694787,0.93063029,-2.05467933,-2.05582156],
-                                [0.91021588,0.84553707,0.45678779,0.48603465],
-                                [0.65593731,-0.11704429,0.47716673,0.48872792]])
+        clus_center = self.mu
         print(j)
         print("ans:")
         print(clus_center)
         gauss = self.make_gauss_model(clus_center,self.g_sigma)
         ganma = self.ganma_init(samples,gauss)
-        
+
         N_k,mu,S = self.cal(ganma,samples)
-        #print(S)
-        #print(S)
         gauss = self.make_gauss_model(mu,S)
-        #alpha,beta,nu,m,W,alpha_0,beta_0,nu_0,m_0,W_0 = self.M_step(N_k,mu,S)
-        #print(W)
-        #E_ln_A,E_ln_pi,E_mu_A,ganma = self.E_step(alpha,beta,nu,m,W,samples)
+        alpha,beta,nu,m,W,alpha_0,beta_0,nu_0,m_0,W_0 = self.M_step(N_k,mu,S)
+        E_ln_A,E_ln_pi,E_mu_A,ganma = self.E_step(alpha,beta,nu,m,W,samples)
 
         for i in range(count):
             #N_k,mu,S = self.cal(ganma)
@@ -283,18 +280,34 @@ class VBGMM():
                             num += 1
                     print(num)
                     fin_count = i
-                    #break
+                    break
             self.pai = np.exp(E_ln_pi)
             N_k,mu,S = self.cal(ganma,samples)
             gauss = self.make_gauss_model(mu,S)
             print("count:{}".format(i))
-            #print(W)
             print(self.pai)
 
         while not rospy.is_shutdown():
+            #count = 100
+            #fin = [0 for i in range (self.k)]
+            #for i in range(count):
+                #alpha,beta,nu,m,W,alpha_0,beta_0,nu_0,m_0,W_0 = self.M_step(N_k,mu,S)
+                #E_ln_A,E_ln_pi,E_mu_A,ganma = self.E_step(alpha,beta,nu,m,W,samples)
+                #if i > 1:
+                #juge = convergence(pai2,i)
+                #if juge == K:
+                    #print("finish!!!!")
+                    #fin_count = i
+                    #break
+                #self.pai = np.exp(E_ln_pi)
+                #N_k,mu,S = cal(ganma)
+                #self.gauss = self.make_gauss_model(mu,S)
+                #print("count:{}".format(i))
+                #print(pai)
+            #self.output_decision()
             rate.sleep()
             
 
 if __name__ == '__main__':
-    rospy.init_node('vbgmm')
-    VBGMM().run()
+    rospy.init_node('logger')
+    Logger().run()
