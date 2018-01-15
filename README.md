@@ -12,8 +12,10 @@ LightSensorからバグファイルに記録して、変分ベイズによる混
   * [ryuichiueda/raspimouse_ros](https://github.com/ryuichiueda/raspimouse_ros.git)
 
 ## Description
-センサの値をバグファイルに記録
-バグファイルを読み取り、クラスタリングを行う
+センサの値をバグファイルに記録  
+バグファイルを読み取り、クラスタリングを行う  
+クラスタ数と各クラスタの混合率を表示する
+
 
 ## Installation
 ```
