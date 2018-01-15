@@ -113,8 +113,8 @@ class Logger():
         return N_k,mu,S
     
     def M_step(self,N_k,mu,S):
-        alpha_0 = 0.01
-        beta_0 = 0.01
+        alpha_0 = 0.001
+        beta_0 = 0.001
         nu_0 = 1.0
         m_0 = np.zeros((self.k,2))
         m = np.zeros((self.k,2))
