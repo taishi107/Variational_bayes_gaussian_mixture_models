@@ -13,6 +13,7 @@ from scipy.special import digamma
 from scipy.stats import multivariate_normal
 import math
 import random
+import csv
 
 
 class Logger():
@@ -196,6 +197,7 @@ class Logger():
                     self.right_side = []
                     self.left_side = []
                     self.left_forward = []
+                    self.sensor_data = []
 
                     for topic, msg, t in self.bag.read_messages(topics=['/event']):
                         #print("pan")
@@ -204,6 +206,11 @@ class Logger():
                         self.left_side.append(float(msg.left_side))
                         self.left_forward.append(float(msg.left_forward))
                         #print(float(msg.left_forward))
+                        self.sensor_data.append([float(msg.left_forward),float(msg.left_side),float(msg.right_side),float(msg.right_forward)])
+                    with open('sensor_data.csv','w') as f:    
+                        writer = csv.writer(f, lineterminator='\n')
+                        writer.writerows(self.sensor_data)
+                    print('csv!!!')
                     sensor_values = np.c_[self.left_forward, self.left_side, self.right_side, self.right_forward]
                     
                     ss = StandardScaler()
