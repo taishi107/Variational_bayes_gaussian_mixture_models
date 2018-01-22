@@ -35,11 +35,14 @@ $ cd ~/catkin_ws
 $ catkin_make
 ```
 ## Usage
+センサ値の記録
 ```
 $ roscore
 $ rosrun raspimouse_ros rtlightsensors.py
 $ rosrun Variational_bayes_gaussian_mixture_models logger.py
-$ ctrl -C
+```
+クラスタリング開始
+```
 $ rosrun Variational_bayes_gaussian_mixture_models vbgmm.py
 ```
 ## License
